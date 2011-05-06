@@ -48,7 +48,7 @@ class LocaleURLMiddleware(object):
     def process_request(self, request):
         locale, path = utils.strip_path(request.path_info)
         if localeurl_settings.USE_PROFILE_LANGUAGE:
-            locale = self.get_language_from_user(request, locale)
+            locale = self.get_language_for_user(request, locale)
         if localeurl_settings.USE_ACCEPT_LANGUAGE and not locale:
             accept_langs = filter(lambda x: x, [utils.supported_language(lang[0])
                                                 for lang in
