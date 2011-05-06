@@ -36,8 +36,19 @@ class LocaleURLMiddleware(object):
         if not settings.USE_I18N:
             raise django.core.exceptions.MiddlewareNotUsed()
 
+    def get_language_for_user(self, request):
+        if request.user.is_authenticated():
+            try:
+                profile = request.user.get_profile()
+                return profile.language
+            except django.core.exceptions.ObjectDoesNotExist:
+                pass
+        return ''
+
     def process_request(self, request):
         locale, path = utils.strip_path(request.path_info)
+        if localeurl_settings.USE_PROFILE_LANGUAGE and not locale:
+            locale = self.get_language_from_user(request)
         if localeurl_settings.USE_ACCEPT_LANGUAGE and not locale:
             accept_langs = filter(lambda x: x, [utils.supported_language(lang[0])
                                                 for lang in
@@ -67,3 +78,4 @@ class LocaleURLMiddleware(object):
             response['Content-Language'] = translation.get_language()
         translation.deactivate()
         return response
+
