@@ -1,7 +1,11 @@
-from urlparse import urlsplit
+try:
+    from urlparse import urlsplit
+except ImportError:
+    from urllib.parse import urlsplit
 from django import http
 from django.utils.translation import check_for_language
 from localeurl import utils
+from localeurl import settings as localeurl_settings
 
 def change_locale(request):
     """
@@ -11,13 +15,17 @@ def change_locale(request):
     """
     next = request.REQUEST.get('next', None)
     if not next:
-        next = urlsplit(request.META.get('HTTP_REFERER', None))[2]
+        referrer = request.META.get('HTTP_REFERER', None)
+        if referrer:
+            next = urlsplit(referrer)[2]
     if not next:
         next = '/'
     _, path = utils.strip_path(next)
     if request.method == 'POST':
         locale = request.POST.get('locale', None)
         if locale and check_for_language(locale):
+            if localeurl_settings.USE_SESSION:
+                request.session['django_language'] = locale
             path = utils.locale_path(path, locale)
 
     response = http.HttpResponseRedirect(path)

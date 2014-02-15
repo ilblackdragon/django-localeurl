@@ -6,6 +6,27 @@ Changelog
 ---------
 
 Tip: (unreleased)
+
+Release 2.0.1: (2013-09-19)
+  * Change canonical documentation links from
+    http://pythonhosted.org/django-localeurl/ to
+    http://django-localeurl.readthedocs.org
+
+Release 2.0: (2013-09-19)
+  * BACKWARDS-INCOMPATIBLE: Drop support for Django 1.0 - 1.2; Python 2.4 and 2.5.
+  * Deprecate ``localeurl_future`` tag library, always use new url tag syntax.
+  * Try importing ``patterns, url`` first from ``django.conf.urls``; use
+    ``django.conf.urls.defaults`` only as Django 1.3 fallback. Fixes #36.
+  * Don't try to parse referrer if not present. Fixes #33. Thanks Simon Luijk.
+  * Add support for a session-stored locale fallback. Thanks Sylvain Fourmanoit
+    for report and draft patch, and Alex Marandon for adding tests. Fixes #23.
+  * Make language-code matching case-insensitive, per RFC. Thanks torgeilo for
+    the report. Fixes #32.
+  * Fix issue with non-ASCII characters in URLs. Thanks Chris Adams.
+
+Release 1.5: (2011-08-24)
+  * Added ``LOCALE_REDIRECT_PERMANENT`` setting; defaults to True, if set to
+    ``False`` 302 redirects are used rather than 301. Thanks oyvindeh.
   * ``LOCALE_INDEPENDENT_PATHS`` can now be plain string regular expressions,
     they don't have to be compiled regex objects. Fixes #9.
   * Added import of ``localeurl.models`` to ``localeurl.middleware``, to ensure

@@ -12,8 +12,10 @@ if not settings.configured:
             'localeurl',
             'localeurl.tests',
             'django.contrib.sites', # for sitemap test
+            'django.contrib.sessions', # for USE_SESSION
             ),
         ROOT_URLCONF='localeurl.tests.test_urls',
+        SITE_ID=1,
         )
     if VERSION >= (1, 2):
         settings_dict["DATABASES"] = {

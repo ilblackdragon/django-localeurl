@@ -53,13 +53,11 @@ class LocaleurlTestCase(TestCase):
         settings_fixture(self.settings_manager)
         translation.activate("en")
         reload(localeurl_settings)
-        reload(urlresolvers)
 
 
     def tearDown(self):
         self.settings_manager.revert()
         reload(localeurl_settings)
-        reload(urlresolvers)
 
 
 
@@ -164,6 +162,22 @@ class MiddlewareTestCase(LocaleurlTestCase):
         self.assertEqual('/test/bla/bla/', r1.path_info)
 
 
+    def test_case_insensitive_locale(self):
+        r1 = self.request_factory.get('/nl-NL/test/bla/bla/')
+        r2 = self.middleware.process_request(r1)
+        self.assertEqual(None, r2)
+        self.assertEqual('nl-nl', r1.LANGUAGE_CODE)
+        self.assertEqual('/test/bla/bla/', r1.path_info)
+
+
+    def test_non_lowercase_path(self):
+        r1 = self.request_factory.get('/nl-nl/TEST/bla/bla/')
+        r2 = self.middleware.process_request(r1)
+        self.assertEqual(None, r2)
+        self.assertEqual('nl-nl', r1.LANGUAGE_CODE)
+        self.assertEqual('/TEST/bla/bla/', r1.path_info)
+
+
     def test_locale_independent_url(self):
         r1 = self.request_factory.get('/test/independent/bla/bla/')
         r2 = self.middleware.process_request(r1)
@@ -196,11 +210,37 @@ class MiddlewareTestCase(LocaleurlTestCase):
         urlresolvers.set_script_prefix(previous_script_prefix)
 
 
+    def test_redirect_statuscode_302(self):
+        self.settings_manager.set(LOCALE_REDIRECT_PERMANENT=False)
+        reload(localeurl_settings)
+
+        r1 = self.request_factory.get('/nl-be/test/independent/?foo=bar')
+        r2 = self.middleware.process_request(r1)
+        self.assertEqual(302, r2.status_code)
+
+
+    def test_redirect_statuscode_default(self):
+        r1 = self.request_factory.get('/nl-be/test/independent/?foo=bar')
+        r2 = self.middleware.process_request(r1)
+        self.assertEqual(301, r2.status_code)
+
+
     def test_check_accept_lang(self):
         self.settings_manager.set(LOCALEURL_USE_ACCEPT_LANGUAGE=True)
         reload(localeurl_settings)
 
         r1 = self.request_factory.get('/test/', HTTP_ACCEPT_LANGUAGE='fr, de;q=0.8')
+        r2 = self.middleware.process_request(r1)
+        self.assertEqual(301, r2.status_code)
+        self.assertEqual('/fr/test/', r2['Location'])
+
+
+    def test_check_session_enabled(self):
+        self.settings_manager.set(LOCALEURL_USE_SESSION=True)
+        reload(localeurl_settings)
+
+        r1 = self.request_factory.get('/test/')
+        r1.session = {'django_language': 'fr'}
         r2 = self.middleware.process_request(r1)
         self.assertEqual(301, r2.status_code)
         self.assertEqual('/fr/test/', r2['Location'])
@@ -231,6 +271,27 @@ class DefaultPrefixMiddlewareTestCase(MiddlewareTestCase):
         r2 = self.middleware.process_request(r1)
         self.assertEqual(301, r2.status_code)
         self.assertEqual('/en/test/?somevar=someval', r2['Location'])
+
+    def test_with_unescaped_query_string(self):
+        # This contains an ISO-88591-2 latin small letter C with cedilla,
+        # received in a request declared as windows-1251:
+        r1 = self.request_factory.get('/test/?somevar=Mudan\xe7as_recentes')
+        r2 = self.middleware.process_request(r1)
+        self.assertEqual(301, r2.status_code)
+        self.assertEqual('/en/test/?somevar=Mudan%E7as_recentes', r2['Location'])
+
+
+    def test_check_session_disabled(self):
+        self.settings_manager.set(LOCALEURL_USE_SESSION=False)
+        reload(localeurl_settings)
+
+        r1 = self.request_factory.get('/test/')
+        r1.session = {'locale': 'fr'}
+        r2 = self.middleware.process_request(r1)
+        self.assertEqual(301, r2.status_code)
+        self.assertEqual('/en/test/', r2['Location'])
+
+
 
 
 
@@ -263,6 +324,15 @@ class NoDefaultPrefixMiddlewareTestCase(MiddlewareTestCase):
         self.assertEqual('fr', r1.LANGUAGE_CODE)
         self.assertEqual('/test/foo/', r1.path_info)
 
+    def test_check_session_disabled(self):
+        self.settings_manager.set(LOCALEURL_USE_SESSION=False)
+        reload(localeurl_settings)
+
+        r1 = self.request_factory.get('/test/')
+        r1.session = {'locale': 'fr'}
+        r2 = self.middleware.process_request(r1)
+        self.assertEqual(None, r2)
+
 
 
 class TagsTestCase(LocaleurlTestCase):
@@ -274,16 +344,16 @@ class TagsTestCase(LocaleurlTestCase):
 
     def test_locale_url_tag(self):
         self.assertRaises(ValueError, self.render_template,
-                '{% locale_url "nl" dummy0 %}')
+                '{% locale_url "nl" "dummy0" %}')
 
         self.assertEqual('/en/dummy/', self.render_template(
-                '{% locale_url "en-us" dummy0 %}'))
+                '{% locale_url "en-us" "dummy0" %}'))
 
         self.assertEqual('/fr/dummy/4', self.render_template(
-            '{% locale_url "fr" dummy1 test=4 %}'))
+            '{% locale_url "fr" "dummy1" test=4 %}'))
 
         self.assertEqual('/en/dummy/4', self.render_template(
-            '{% locale_url "en" dummy1 test=4 as testvar %}{{ testvar }}'))
+            '{% locale_url "en" "dummy1" test=4 as testvar %}{{ testvar }}'))
 
 
     def test_chlocale_filter(self):
@@ -310,10 +380,10 @@ class TagsTestCase(LocaleurlTestCase):
         reload(localeurl_settings)
 
         self.assertEqual('/dummy/', self.render_template(
-                '{% locale_url "en-us" dummy0 %}'))
+                '{% locale_url "en-us" "dummy0" %}'))
 
         self.assertEqual('/fr/dummy/', self.render_template(
-            '{% locale_url "fr" dummy0 %}'))
+            '{% locale_url "fr" "dummy0" %}'))
 
 
     def test_chlocale_filter_no_default_prefix(self):
@@ -325,45 +395,6 @@ class TagsTestCase(LocaleurlTestCase):
 
         self.assertEqual('/fr/dummy/', self.render_template(
                 '{{"/nl-nl/dummy/"|chlocale:"fr"}}'))
-
-try:
-    from localeurl.templatetags import localeurl_future
-except ImportError:
-    localeurl_future = None
-
-
-# @@@ use proper test skipping once Django 1.2 is minimum version
-if localeurl_future is not None:
-    class FutureTagsTestCase(LocaleurlTestCase):
-        def render_template(self, text):
-            t = test_utils.TestTemplate(text, libraries=[localeurl_future.register])
-            c = template.Context()
-            return t.render(c)
-
-
-        def test_locale_url_tag(self):
-            self.assertRaises(ValueError, self.render_template,
-                    '{% locale_url "nl" "dummy0" %}')
-
-            self.assertEqual('/en/dummy/', self.render_template(
-                    '{% locale_url "en-us" "dummy0" %}'))
-
-            self.assertEqual('/fr/dummy/4', self.render_template(
-                '{% locale_url "fr" "dummy1" test=4 %}'))
-
-            self.assertEqual('/en/dummy/4', self.render_template(
-                '{% locale_url "en" "dummy1" test=4 as testvar %}{{ testvar }}'))
-
-
-        def test_locale_url_tag_no_default_prefix(self):
-            self.settings_manager.set(PREFIX_DEFAULT_LOCALE=False)
-            reload(localeurl_settings)
-
-            self.assertEqual('/dummy/', self.render_template(
-                    '{% locale_url "en-us" "dummy0" %}'))
-
-            self.assertEqual('/fr/dummy/', self.render_template(
-                '{% locale_url "fr" "dummy0" %}'))
 
 
 
@@ -420,3 +451,28 @@ class ReverseTestCase(LocaleurlTestCase):
     def test_kwargs_none(self):
         url = reverse("dummy1", args=["test"], kwargs=None)
         self.assertEqual(url, "/en/dummy/test")
+
+
+class ViewsTestCase(LocaleurlTestCase):
+
+    urls = 'localeurl.urls'
+
+    def setUp(self):
+        super(LocaleurlTestCase, self).setUp()
+        self.settings_manager = test_utils.TestSettingsManager()
+
+    def test_change_locale_check_session_enabled(self):
+        self.settings_manager.set(LOCALEURL_USE_SESSION=True)
+        reload(localeurl_settings)
+        self.client.post('/change/', data={'locale': 'de', 'next': '/foo'})
+        self.assertEqual("de", self.client.session['django_language'])
+
+    def test_change_locale_check_session_disabled(self):
+        self.settings_manager.set(LOCALEURL_USE_SESSION=False)
+        reload(localeurl_settings)
+        self.client.post('/change/', data={'locale': 'de', 'next': '/foo'})
+        self.assertNotEqual("de", self.client.session.get('django_language'))
+
+    def test_change_without_next(self):
+        response = self.client.post('/change/', data={'locale': 'de'})
+        self.assertEqual(response.status_code, 302)

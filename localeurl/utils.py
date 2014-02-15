@@ -35,6 +35,7 @@ def supported_language(locale):
     """
     Returns the supported language (from settings.LANGUAGES) for the locale.
     """
+    locale = locale.lower()
     if locale in localeurl_settings.SUPPORTED_LOCALES:
         return locale
     elif locale[:2] in localeurl_settings.SUPPORTED_LOCALES:
@@ -84,6 +85,6 @@ def strip_script_prefix(url):
 def add_script_prefix(path):
     """
     Prepends the SCRIPT_PREFIX to a path.
-
     """
+
     return ''.join([urlresolvers.get_script_prefix(), path[1:]])
